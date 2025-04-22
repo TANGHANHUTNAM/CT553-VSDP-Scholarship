@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+}
+
+model User {
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String                @unique
+  password             String
+  date_of_birth        DateTime?
+  gender               Gender?
+  phone_number         String?
+  avatar_url           String?
+  public_id            String?
+  generation           String?
+  job_title            String?
+  school               String?
+  major                String?
+  company              String?
+  active               Boolean               @default(true)
+  is_external_guest    Boolean               @default(false)
+  refresh_token        String?
+  start_date           DateTime?             @db.Timestamptz
+  end_date             DateTime?             @db.Timestamptz
+  created_at           DateTime?             @default(now()) @db.Timestamptz
+  updated_at           DateTime?             @updatedAt @db.Timestamptz
+  roleId               Int
+  role                 Role                  @relation(fields: [roleId], references: [id])
+  response_scores      ResponseScores[]
+  response_assignments ResponseAssignments[]
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  description String?
+  created_at  DateTime?        @default(now())
+  updated_at  DateTime?        @updatedAt
+  active      Boolean          @default(true)
+  permissions RolePermission[]
+  users       User[]
+}
+
+model Permission {
+  id         Int              @id @default(autoincrement())
+  name       String?
+  module     String?
+  method     String?
+  created_at DateTime?        @default(now())
+  updated_at DateTime?        @updatedAt
+  api_path   String?
+  roles      RolePermission[]
+
+  @@unique([api_path, method])
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  role         Role       @relation(fields: [roleId], references: [id])
+  @@id([roleId, permissionId])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum Scope {
+  SCHOLARSHIP
+  SURVEY
+}
+
+model Form {
+  id               String            @id @default(uuid())
+  name             String
+  description      String?
+  creator_name     String?
+  creator_id       Int?
+  is_public        Boolean?          @default(false)
+  is_default       Boolean?          @default(false) 
+  primary_color    String?           @default("#09BDD4")
+  block_color      String?           @default("#ffffff")
+  background_color String?           @default("#DAF5F9")
+  share_token      String?           @unique          
+  share_expiry     DateTime?        
+  start_date       DateTime?
+  end_date         DateTime?
+  scope            Scope? 
+  image_url        String?
+  public_id        String?
+  created_at       DateTime?         @default(now()) @db.Timestamptz
+  updated_at       DateTime?         @updatedAt @db.Timestamptz
+  form_responses   FormResponses[]
+  form_sections    FormSections[]
+  scoring_sections ScoringSections[]
+  snapshots        FormSnapshots[] 
+}
+
+model FormSections {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  json_blocks Json[]   @default([])
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+  form_id     String
+  form        Form     @relation(fields: [form_id], references: [id], onDelete: Cascade)
+}
+
+model FormResponses {
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  email                String
+  phone_number         String
+ snapshot_version     String                  
+  snapshot             FormSnapshots         @relation(fields: [snapshot_version], references: [version])
+  created_at           DateTime?             @default(now()) @db.Timestamptz
+  form_id              String
+  form                 Form                  @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  status               ApplicantStatus?      @default(SUBMITTED)
+  university_id        Int?                  @default(dbgenerated("NULL"))
+  university           Universities?         @relation(fields: [university_id], references: [id])
+  response_scores      ResponseScores[]
+  response_assignments ResponseAssignments[]
+  final_scores         Json[]                @default([])
+  total_final_score    Int?
+  field_value_responses FieldValueResponses[]
+  updated_at           DateTime?             @updatedAt @db.Timestamptz
+  notes                String?           
+  rejected_reason       String?               
+  
+
+  @@index([name])
+  @@index([email])
+  @@index([phone_number])
+  @@index([form_id])
+  @@index([status])
+  @@index([total_final_score])
+
+}
+
+
+model FormSnapshots {
+  id            Int            @id @default(autoincrement())
+  form_id       String
+  form          Form           @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  version       String          @unique
+  snapshot_json Json[]         @default([])     
+  created_at    DateTime       @default(now()) @db.Timestamptz
+  responses     FormResponses[]
+   
+  @@unique([form_id, version]) 
+}
+
+model FieldValueResponses {
+  id              Int           @id @default(autoincrement())
+  form_response_id Int
+  field_id        String
+  value_string    String?     
+  value_number    Float?        
+  value_array     String[]     
+  value_json      Json?    
+  form_response   FormResponses @relation(fields: [form_response_id], references: [id], onDelete: Cascade)
+
+  @@unique([form_response_id, field_id])
+  @@index([form_response_id])
+  @@index([field_id])
+  @@index([value_number])
+  @@index([value_string])
+}
+
+model Universities {
+  id             Int             @id @default(autoincrement())
+  name           String          @unique
+  is_active      Boolean         @default(true)
+  created_at     DateTime        @default(now()) @db.Timestamptz
+  updated_at     DateTime        @updatedAt @db.Timestamptz
+  form_responses FormResponses[]
+}
+
+model ScoringSections {
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  description          String?
+  max_score            Int
+  created_at           DateTime              @default(now()) @db.Timestamptz
+  updated_at           DateTime              @updatedAt @db.Timestamptz
+  form_id              String
+  form                 Form                  @relation(fields: [form_id], references: [id], onDelete: Cascade)
+  scoring_criteria     ScoringCriterias[]
+  response_assignments ResponseAssignments[]
+}
+
+model ScoringCriterias {
+  id                 Int              @id @default(autoincrement())
+  name               String
+  description        String?
+  max_score          Int
+  min_score          Int
+  created_at         DateTime         @default(now()) @db.Timestamptz
+  updated_at         DateTime         @updatedAt @db.Timestamptz
+  scoring_section_id Int
+  scoring_section    ScoringSections  @relation(fields: [scoring_section_id], references: [id], onDelete: Cascade)
+  response_scores    ResponseScores[]
+}
+
+model ResponseScores {
+  id                  Int              @id @default(autoincrement())
+  score_value         Int
+  comment             String?
+  created_at          DateTime         @default(now()) @db.Timestamptz
+  updated_at          DateTime         @updatedAt @db.Timestamptz
+  form_response_id    Int
+  form_response       FormResponses    @relation(fields: [form_response_id], references: [id], onDelete: Cascade)
+  scoring_criteria_id Int
+  scoring_criteria    ScoringCriterias @relation(fields: [scoring_criteria_id], references: [id], onDelete: Cascade)
+  user_id             Int
+  user                User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  finalized_by        Int?
+  finalized_at        DateTime?
+  rejection_reason   String?
+
+  @@index([form_response_id, scoring_criteria_id, user_id])
+  @@unique([form_response_id, scoring_criteria_id, user_id])
+}
+
+model ResponseAssignments {
+  id                 Int             @id @default(autoincrement())
+  is_completed       Boolean         @default(false)
+  completed_at       DateTime?
+  form_response_id   Int
+  form_response      FormResponses   @relation(fields: [form_response_id], references: [id], onDelete: Cascade)
+  user_id            Int
+  user               User            @relation(fields: [user_id], references: [id])
+  scoring_section_id Int
+  scoring_section    ScoringSections @relation(fields: [scoring_section_id], references: [id], onDelete: Cascade)
+  created_at         DateTime        @default(now()) @db.Timestamptz
+  updated_at         DateTime        @updatedAt @db.Timestamptz
+
+  @@index([form_response_id, user_id, scoring_section_id])
+}
+
+model Page {
+  id          Int      @id @default(autoincrement())
+  sluge      String   @unique
+  title       String
+ content Json[]   @default([])
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+}
+
+model SiteConfig {
+  id          Int      @id @default(autoincrement())
+  key       String   @unique
+  value Json[]   @default([])
+  created_at  DateTime @default(now()) @db.Timestamptz
+  updated_at  DateTime @updatedAt @db.Timestamptz
+}
+
+
+
+enum ApplicantStatus {
+  SUBMITTED // Đang chờ xử lý
+  CHECKED // Chấp nhận
+  REJECTED // Từ chối
+  INTERVIEWING // Phỏng vấn
+  FAILED // Rớt
+  PASSED // Đậu
+}
