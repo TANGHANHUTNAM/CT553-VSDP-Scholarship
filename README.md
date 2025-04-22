@@ -1,1 +1,1 @@
-![Alt text](path/to/architecture.jpg)
+![Architecture](architecture.jpg)
